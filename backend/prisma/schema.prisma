@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Tabelas existentes (referências) ---
+// Estas tabelas são do Open-Trafego, apenas leitura no admin
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  passwordHash   String?
+  role           Role      @default(USER)
+  tenantId       String
+  tenant         Tenant     @relation(fields: [tenantId], references: [id])
+  avatarUrl      String?
+  lastLoginAt    DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+model Tenant {
+  id                   String    @id @default(cuid())
+  name                 String
+  subdomain            String    @unique
+  customDomain         String?   @unique
+  logoUrl              String?
+  primaryColor         String    @default("#00F5D4")
+  secondaryColor       String    @default("#7B2FBE")
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?  @unique
+  plan                 Plan       @default(STARTER)
+  status               TenantStatus @default(TRIAL)
+  trialEndsAt          DateTime?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  users                User[]
+}
+
+model Subscription {
+  id                     String    @id @default(cuid())
+  stripeSubscriptionId   String    @unique
+  userId                 String
+  user                   User      @relation(fields: [userId], references: [id])
+  status                 String
+  currentPeriodStart     DateTime
+  currentPeriodEnd       DateTime
+  cancelAtPeriodEnd      Boolean   @default(false)
+  canceledAt             DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+}
+
+// (Enums do Open-Trafego)
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum Plan {
+  STARTER
+  PRO
+  AGENCY
+}
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+// --- Tabelas do Admin Dashboard ---
+
+model AdminUser {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String    @map("password_hash")
+  role              AdminRole  @default(ADMIN)
+  twoFactorSecret   String?   @map("two_factor_secret")
+  twoFactorEnabled  Boolean   @default(false) @map("two_factor_enabled")
+  lastLoginAt       DateTime? @map("last_login_at")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("admin_users")
+}
+
+model AdminLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  admin       AdminUser @relation(fields: [adminId], references: [id])
+  action      String
+  entityType  String?  @map("entity_type")
+  entityId    String?  @map("entity_id")
+  details     Json?
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("admin_logs")
+}
+
+model SystemMetric {
+  id              DateTime @id @default(now())
+  metricDate      DateTime @unique @map("metric_date")
+  mrr             Decimal? @db.Decimal(10,2)
+  arr             Decimal? @db.Decimal(10,2)
+  activeUsers     Int?
+  newUsers        Int?
+  churnedUsers    Int?     @map("churned_users")
+  conversionRate  Decimal? @db.Decimal(5,2) @map("conversion_rate")
+  revenue         Decimal? @db.Decimal(10,2)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("system_metrics")
+}
+
+model NotificationQueue {
+  id             String    @id @default(cuid())
+  type           String
+  recipientEmail String?  @map("recipient_email")
+  subject        String?
+  body           String?
+  scheduledAt    DateTime  @map("scheduled_at")
+  sentAt         DateTime? @map("sent_at")
+  status         String    @default("pending")
+  attempts       Int       @default(0)
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now())
+
+  @@map("notification_queue")
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  FINANCE
+  SUPPORT
+}
