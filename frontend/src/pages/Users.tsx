@@ -1,82 +1,58 @@
 import { useEffect, useState } from 'react';
-import { usersApi } from '../services/api';
+import axios from 'axios';
 
-export default function Users() {
+interface Props {
+  token: string;
+}
+
+export default function Users({ token }: Props) {
   const [users, setUsers] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>({});
-  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-
-  const fetchUsers = async (pageNum: number, searchQuery: string) => {
-    setLoading(true);
-    try {
-      const res = await usersApi.list({ page: pageNum, limit: 20, search: searchQuery });
-      setUsers(res.data.users);
-      setPagination(res.data.pagination);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    fetchUsers(page, search);
-  }, [page, search]);
+    fetchUsers();
+  }, [token, search]);
+
+  const fetchUsers = () => {
+    axios.get('/api/admin/users' + (search ? `?search=${encodeURIComponent(search)}` : ''), {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => setUsers(res.data.users))
+      .catch(console.error);
+  };
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6 text-primary">Usuários</h1>
-
-      <div className="mb-4 flex gap-2">
-        <input
-          type="text"
-          placeholder="Buscar por email ou nome..."
-          className="w-full max-w-md p-2 rounded bg-gray-800 text-white border border-gray-700"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        />
-      </div>
-
-      {loading ? (
-        <p>Carregando...</p>
-      ) : (
-        <div className="bg-surface rounded-lg overflow-hidden">
-          <table className="w-full text-left">
-            <thead className="bg-gray-800">
-              <tr>
-                <th className="p-3">Email</th>
-                <th className="p-3">Nome</th>
-                <th className="p-3">Tenant</th>
-                <th className="p-3">Plano</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Cadastro</th>
+    <div className="p-6">
+      <h1 className="text-3xl font-bold mb-6 text-cyan-400">Usuários</h1>
+      <input
+        type="text"
+        placeholder="Buscar por email ou nome..."
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        className="w-full p-2 mb-4 rounded bg-gray-800 text-white border border-gray-700"
+      />
+      <div className="bg-gray-800 rounded-lg overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-700">
+            <tr>
+              <th className="p-2">Email</th>
+              <th className="p-2">Nome</th>
+              <th className="p-2">Tenant</th>
+              <th className="p-2">Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map(u => (
+              <tr key={u.id} className="border-t border-gray-700">
+                <td className="p-2">{u.email}</td>
+                <td className="p-2">{u.name}</td>
+                <td className="p-2">{u.tenant?.name}</td>
+                <td className="p-2">{u.role}</td>
               </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-t border-gray-700 hover:bg-gray-800">
-                  <td className="p-3">{u.email}</td>
-                  <td className="p-3">{u.name || '-'}</td>
-                  <td className="p-3">{u.tenant?.name || '-'}</td>
-                  <td className="p-3">{u.tenant?.plan || '-'}</td>
-                  <td className="p-3">{u.tenant?.status || '-'}</td>
-                  <td className="p-3">{new Date(u.createdAt).toLocaleDateString('pt-BR')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {pagination.pages > 1 && (
-        <div className="mt-4 flex gap-2">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 bg-gray-700 rounded disabled:opacity-50">Anterior</button>
-          <span>Página {page} de {pagination.pages}</span>
-          <button onClick={() => setPage(p => Math.min(pagination.pages, p + 1))} disabled={page === pagination.pages} className="px-3 py-1 bg-gray-700 rounded disabled:opacity-50">Próxima</button>
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

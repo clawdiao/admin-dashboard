@@ -1,61 +1,50 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { authApi } from '../services/api';
+import axios from 'axios';
 
-export default function Login({ onLogin }: { onLogin: () => void }) {
+interface Props {
+  onLogin: (token: string) => void;
+}
+
+export default function Login({ onLogin }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handle = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
     try {
-      const res = await authApi.login(email, password);
+      const res = await axios.post('/api/auth/login', { email, password });
       localStorage.setItem('admin_token', res.data.token);
-      onLogin();
-      navigate('/');
+      onLogin(res.data.token);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed');
-    } finally {
-      setLoading(false);
+      setError(err.response?.data?.error || 'Falha no login');
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-dark">
-      <form className="bg-surface p-8 rounded-lg shadow-lg w-full max-w-md" onSubmit={handleSubmit}>
-        <h1 className="text-2xl font-bold mb-6 text-primary">Admin Login</h1>
-        {error && <p className="text-red-500 mb-4">{error}</p>}
-        <div className="mb-4">
-          <label className="block mb-1">Email</label>
-          <input
-            type="email"
-            className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-        <div className="mb-6">
-          <label className="block mb-1">Senha</label>
-          <input
-            type="password"
-            className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        <button
-          type="submit"
-          className="w-full bg-primary text-black font-bold py-2 px-4 rounded hover:opacity-90"
-          disabled={loading}
-        >
-          {loading ? 'Entrando...' : 'Entrar'}
+    <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <form onSubmit={handle} className="bg-gray-800 p-8 rounded-lg w-80">
+        <h1 className="text-2xl font-bold mb-6 text-center text-cyan-400">Admin Login</h1>
+        {error && <p className="text-red-400 mb-4">{error}</p>}
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          className="w-full p-2 mb-4 rounded bg-gray-700 text-white"
+          required
+        />
+        <input
+          type="password"
+          placeholder="Senha"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          className="w-full p-2 mb-6 rounded bg-gray-700 text-white"
+          required
+        />
+        <button type="submit" className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded">
+          Entrar
         </button>
       </form>
     </div>

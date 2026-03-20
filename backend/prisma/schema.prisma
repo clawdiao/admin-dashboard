@@ -323,6 +323,16 @@ model NotificationQueue {
   @@map("notification_queue")
 }
 
+model SystemConfig {
+  key          String   @id
+  value        String?  // encrypted in application if needed
+  description  String?
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@map("system_config")
+}
+
 enum AdminRole {
   SUPER_ADMIN
   FINANCE

@@ -1,162 +1,144 @@
-# Admin Dashboard — Gestão Interna
+# Admin Dashboard
 
-Painel administrativo unificado para controlar usuários, assinaturas e métricas dos produtos:
-
-- **Open-Trafego** (SaaS tráfego pago)
-- **AntiGravity Kit** (produto low-ticket)
+Painel administrativo unificado para gestão de usuários, assinaturas e métricas dos produtos **Open-Trafego** e **AntiGravity Kit**.
 
 ---
 
 ## 🚀 Quick Start
 
+### Backend
+
 ```bash
-# Backend
 cd backend
 npm install
 cp .env.example .env
-# Edite .env com DATABASE_URL (NeonDB) e outras chaves
-npx prisma generate
+# Edite .env: DATABASE_URL, ADMIN_JWT_SECRET, Stripe keys, etc.
 npm run db:push
-npm run seed   # cria admin inicial
-npm run dev     # roda em http://localhost:3001
+npm run db:seed   # cria admin@clawdiao.com / admin123
+npm run dev       # roda na porta 3002
+```
 
-# Frontend
-cd ../frontend
+### Frontend
+
+```bash
+cd frontend
 npm install
-npm run dev     # roda em http://localhost:5173
+npm run dev       # roda na porta 5173 (proxy /api -> backend:3002)
 ```
 
-**Admin login:**
-- Email: `admin@clawdiao.com`
-- Senha: `admin123`
+Acesse: http://localhost:5173
+
+Login admin: `admin@clawdiao.com` / `admin123`
 
 ---
 
-## 📦 Stack
+## 📊 Features
 
-- Backend: Node.js + Express + TypeScript + Prisma
-- Frontend: React + Vite + Tailwind + Recharts
-- DB: NeonDB (PostgreSQL)
-- Auth: JWT (admin sessions)
-- Pagamentos: Stripe (sync de assinaturas)
-- Deploy: Railway (backend) + Vercel (frontend)
-
----
-
-## 🔐 Variáveis de Ambiente
-
-### Backend (.env)
-
-```env
-DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
-ADMIN_JWT_SECRET="super-secret-jwt-key"
-ADMIN_JWT_EXPIRES_IN="1h"
-STRIPE_SECRET_KEY="sk_live_..."
-STRIPE_WEBHOOK_SECRET="whsec_..."
-CORS_ORIGIN="http://localhost:5173"
-RESEND_API_KEY="re_..."
-FROM_EMAIL="admin@yourdomain.com"
-LOG_LEVEL="info"
-```
-
-### Frontend (.env.production — Vercel)
-
-```env
-VITE_API_URL=https://seu-backend.railway.app
-```
+- Dashboard Overview (usuários, assinaturas, trials)
+- Gestão de Usuários (busca, detalhes)
+- Gestão de Assinaturas (list, cancel, reactivate, change plan via Stripe)
+- Métricas ( gráficos, MRR placeholder — sync via Stripe webhook necessário)
+- Configurações do Sistema (salvar chaves Stripe, Resend, Meta, Google no banco)
+- Logs de ações administrativas (audit trail)
 
 ---
 
-## 🗃️ Database Schema
+## 🔐 Segurança
 
-Tabelas admin (criadas via Prisma):
+- Autenticação JWT própria (admin)
+- Papéis: SUPER_ADMIN, FINANCE, SUPPORT
+- Rate limiting
+- Audit log de todas as ações
+- Senhas com bcrypt
 
+---
+
+## 🗃️ Banco de Dados
+
+Usa o **NeonDB** já existente. Tabelas:
+
+### Referências (Open-Trafego)
+- Tenant, User, Subscription, Connection, Campaign, Report, Alert, Log, Webhook
+
+### Admin (novas)
 - `admin_users` — administradores
-- `admin_logs` — auditoria de ações
-- `system_metrics` — métricas agregadas diariamente
-- `notification_queue` — emails em fila
-
-Reutiliza tabelas do Open-Trafego:
-
-- `users`
-- `tenants`
-- `subscriptions`
+- `admin_logs` — log de ações
+- `system_metrics` — métricas agregadas (preencher via job)
+- `system_config` — chaves de configuração (Stripe, Resend, etc.)
+- `notification_queue` — fila de emails
 
 ---
 
-## 🔗 Integrações
+## ⚙️ Configuração pelo Admin
+
+1. Login no Admin Dashboard
+2. Vá em **Config** (painel)
+3. Adicione chaves:
+
+| Chave | Descrição |
+|-------|-----------|
+| `STRIPE_SECRET_KEY` | Stripe secret key (live/test) |
+| `STRIPE_WEBHOOK_SECRET` | Segredo do webhook Stripe |
+| `RESEND_API_KEY` | API key para emails (Resend) |
+| `META_APP_ID` / `META_APP_SECRET` | Integração Meta Ads |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google Ads |
+| `OPENROUTER_API_KEY` | OpenRouter (IA) |
+
+Valores ficam salvos na tabela `system_config`.  
+Backend lê dessas variáveis do banco em vez de `.env` (exceto `ADMIN_JWT_SECRET` e `DATABASE_URL`).
+
+---
+
+## 🔄 Webhooks
 
 ### Stripe
-O admin pode gerenciar assinaturas (cancelar, reativar, mudar plano) usando a API do Stripe.
+- Endpoint: `/api/webhooks/stripe` (backend Open-Trafego)
+- Eventos: `checkout.session.completed`, `customer.subscription.updated`, `invoice.payment_failed`
+- Ao receber, atualiza `subscriptions`, `tenants`, e grava métricas.
 
-- `STRIPE_SECRET_KEY` necessária
-- `STRIPE_WEBHOOK_SECRET` para receber updates (configurar webhook)
-
-### Resend (opcional)
-Para enviar emails de notificação (ex: falha pagamento, trial expirando).
-
----
-
-## 📊 Features MVP
-
-- Login admin (email/senha)
-- Dashboard overview (usuários, assinaturas ativas, novos trials expirando)
-- Listagem de usuários (com busca)
-- Listagem de assinaturas (com ações cancel/reenable)
-- Métricas básicas ( gráficos dummy para estrutura )
-- Logs de admin actions (audit trail)
-- Health check do sistema
-
----
-
-## 🏗️ Extensões Futuras
-
-- Sincronização automática de dados Stripe → tabela `subscriptions`
-- Cálculo de MRR/ARR real
-- Funil de conversão (event tracking)
-- Exportação CSV/PDF de relatórios
-- Notificações internas (email admin quando pagamento falha, etc)
-- 2FA para admins
-- Multi-role (finance, support, super_admin)
-- KPI cards personalizáveis
-- Dark/Light theme toggle
+Ainda não implementado (pendente após config Stripe keys no Admin Config).
 
 ---
 
 ## 🧪 Testes
 
 ```bash
-# Backend unit (futuro)
-npm test
+# Backend
+npm test   # (precisamos adicionar testes)
 
-# Frontend (futuro)
-npm run test
+# Frontend
+# ainda sem testes automatizados
 ```
 
 ---
 
-## 🚀 Deploy Produção
+## 📦 Deploy
 
-### Backend → Railway
-1. Conecte repo no Railway (GitHub → admin-dashboard/backend)
-2. Configure variables (DATABASE_URL, ADMIN_JWT_SECRET, STRIPE_SECRET_KEY, etc.)
-3. Deploy automático
+### Backend (Railway)
+1. Conectar repositório
+2. Variáveis de ambiente:
+   - `DATABASE_URL` (NeonDB)
+   - `ADMIN_JWT_SECRET` (escolha uma string forte)
+   - `CORS_ORIGIN` = URL do frontend
+   - `PORT` = padrão Railway ($PORT variável)
+3. Build command: `npm install && npm run db:push`
+4. Start command: `npm start`
 
-### Frontend → Vercel
-1. New Project → Import → `admin-dashboard/frontend`
-2. Set `VITE_API_URL` para URL do backend Railway
-3. Deploy
+### Frontend (Vercel)
+1. Import project (frontend/)
+2. Environment: nenhuma necessária (usa proxy para backend)
+3. Build command: `npm run build` (Vite gera `dist`)
 
 ---
 
-## ⚠️ Segurança
+## 📝 Próximos Passos
 
-- Use HTTPS
--strengthen ADMIN_JWT_SECRET (256-bit random)
-- IP allowlist (opcional)
-- Rate limiting já habilitado
-- Logs de auditoria completos
-- Senhas com bcrypt (10 rounds)
+- [ ] Implementar webhook Stripe completo (syncSubscription, updateMetrics)
+- [ ] Calcular MRR/ARR a partir das assinaturas (caching em system_metrics)
+- [ ] Exportação CSV de relatórios
+- [ ] Gráficos de receita ao longo do tempo
+- [ ] Página de Logs com filtros avançados
+- [ ] Notificações internas (alertas de churn, falhas de pagamento)
 
 ---
 

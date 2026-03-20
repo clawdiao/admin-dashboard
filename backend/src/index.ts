@@ -11,6 +11,7 @@ import userRoutes from './routes/users';
 import subscriptionRoutes from './routes/subscriptions';
 import metricsRoutes from './routes/metrics';
 import logsRoutes from './routes/logs';
+import configRoutes from './routes/config';
 import systemRoutes from './routes/system';
 
 import { adminAuth } from './middleware/adminAuth';
@@ -51,6 +52,7 @@ app.use('/api/admin/users', adminAuth, userRoutes);
 app.use('/api/admin/subscriptions', adminAuth, subscriptionRoutes);
 app.use('/api/admin/metrics', adminAuth, metricsRoutes);
 app.use('/api/admin/logs', adminAuth, logsRoutes);
+app.use('/api/admin/config', adminAuth, configRoutes);
 app.use('/api/admin/system', adminAuth, systemRoutes);
 
 // Health check
