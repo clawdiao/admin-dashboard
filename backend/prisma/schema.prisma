@@ -7,87 +7,272 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- Tabelas existentes (referências) ---
-// Estas tabelas são do Open-Trafego, apenas leitura no admin
-
-model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  name           String?
-  passwordHash   String?
-  role           Role      @default(USER)
-  tenantId       String
-  tenant         Tenant     @relation(fields: [tenantId], references: [id])
-  avatarUrl      String?
-  lastLoginAt    DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-}
+// ============================================
+// MODELS DO OPEN-TRAFEGO (referência — exato)
+// ============================================
 
 model Tenant {
-  id                   String    @id @default(cuid())
+  id                   String   @id @default(cuid())
   name                 String
-  subdomain            String    @unique
-  customDomain         String?   @unique
+  subdomain            String   @unique
+  customDomain         String?
   logoUrl              String?
-  primaryColor         String    @default("#00F5D4")
-  secondaryColor       String    @default("#7B2FBE")
-  stripeCustomerId     String?   @unique
-  stripeSubscriptionId String?  @unique
-  plan                 Plan       @default(STARTER)
-  status               TenantStatus @default(TRIAL)
+  primaryColor         String   @default("#00F5D4")
+  secondaryColor       String   @default("#7B2FBE")
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String? @unique
+  plan                 Plan     @default(STARTER)
+  status               TenantStatus @default(ACTIVE)
   trialEndsAt          DateTime?
-  createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
-  users                User[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  users        User[]
+  connections  Connection[]
+  campaigns    Campaign[]
+  reports      Report[]
+  alerts       Alert[]
+  logs         Log[]
+  webhooks     Webhook[]
+
+  @@index([subdomain])
+  @@index([status])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String?
+  role         UserRole @default(ADMIN)
+  avatarUrl    String?
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenantId   String
+  tenant     Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[] @relation("UserSubscriptions")
+
+  @@index([tenantId])
+  @@index([email])
+}
+
+model Connection {
+  id           String   @id @default(cuid())
+  platform     Platform
+  name         String
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  metadata     Json?
+  isActive     Boolean  @default(true)
+  lastSyncAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, platform, name])
+  @@index([tenantId])
+  @@index([platform])
+}
+
+model Campaign {
+  id             String   @id @default(cuid())
+  externalId     String
+  platform       Platform
+  name           String
+  status         CampaignStatus
+  budget         Float?
+  spent          Float    @default(0)
+  impressions    Int      @default(0)
+  clicks         Int      @default(0)
+  conversions    Int      @default(0)
+  costPerConversion Float?
+  roas           Float?
+  cpc            Float?
+  cpm            Float?
+  campaignType   String?
+  startDate      DateTime?
+  endDate        DateTime?
+  metadata       Json?
+  lastSyncedAt   DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([platform])
+  @@index([status])
+  @@index([lastSyncedAt])
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  type        ReportType
+  periodStart DateTime
+  periodEnd   DateTime
+  fileUrl     String?
+  data        Json?
+  generatedAt DateTime @default(now())
+  sentAt      DateTime?
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([generatedAt])
+}
+
+model Alert {
+  id                String   @id @default(cuid())
+  type              AlertType
+  severity          AlertSeverity
+  title             String
+  message           String
+  metadata          Json?
+  isAcknowledged    Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([createdAt])
+  @@index([isAcknowledged])
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  level     LogLevel
+  message   String
+  context   Json?
+  stack     String?
+  createdAt DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([createdAt])
+  @@index([level])
+}
+
+model Webhook {
+  id          String   @id @default(cuid())
+  eventTypes  String[]
+  url         String
+  secret      String
+  isActive    Boolean  @default(true)
+  lastSentAt  DateTime?
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, url])
+  @@index([tenantId])
 }
 
 model Subscription {
-  id                     String    @id @default(cuid())
-  stripeSubscriptionId   String    @unique
+  id                     String   @id @default(cuid())
+  stripeSubscriptionId   String   @unique
   userId                 String
-  user                   User      @relation(fields: [userId], references: [id])
+  user                   User     @relation("UserSubscriptions", fields: [userId], references: [id])
   status                 String
   currentPeriodStart     DateTime
   currentPeriodEnd       DateTime
-  cancelAtPeriodEnd      Boolean   @default(false)
+  cancelAtPeriodEnd      Boolean  @default(false)
   canceledAt             DateTime?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }
 
-// (Enums do Open-Trafego)
-enum Role {
-  USER
-  ADMIN
-  SUPER_ADMIN
-}
+// ============================================
+// ENUMS (exatos do Open-Trafego)
+// ============================================
 
 enum Plan {
   STARTER
-  PRO
+  GROWTH
   AGENCY
 }
 
 enum TenantStatus {
-  TRIAL
   ACTIVE
-  PAST_DUE
-  CANCELED
+  TRIAL
+  SUSPENDED
+  CANCELLED
 }
 
-// --- Tabelas do Admin Dashboard ---
+enum UserRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum Platform {
+  META
+  GOOGLE
+}
+
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  DELETED
+  ARCHIVED
+  PENDING
+}
+
+enum ReportType {
+  WEEKLY
+  MONTHLY
+  CUSTOM
+  DAILY
+}
+
+enum AlertType {
+  SPEND
+  CAMPAIGN_STATUS
+  BUDGET
+  ROI
+  SYSTEM
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum LogLevel {
+  ERROR
+  WARN
+  INFO
+  DEBUG
+}
+
+// ============================================
+// MODELS DO ADMIN DASHBOARD (novas)
+// ============================================
 
 model AdminUser {
   id                String    @id @default(cuid())
   email             String    @unique
   passwordHash      String    @map("password_hash")
-  role              AdminRole  @default(ADMIN)
+  role              AdminRole @default(SUPER_ADMIN)
   twoFactorSecret   String?   @map("two_factor_secret")
   twoFactorEnabled  Boolean   @default(false) @map("two_factor_enabled")
   lastLoginAt       DateTime? @map("last_login_at")
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+  logs              AdminLog[]
 
   @@map("admin_users")
 }
@@ -108,16 +293,16 @@ model AdminLog {
 }
 
 model SystemMetric {
-  id              DateTime @id @default(now())
-  metricDate      DateTime @unique @map("metric_date")
-  mrr             Decimal? @db.Decimal(10,2)
-  arr             Decimal? @db.Decimal(10,2)
-  activeUsers     Int?
-  newUsers        Int?
-  churnedUsers    Int?     @map("churned_users")
-  conversionRate  Decimal? @db.Decimal(5,2) @map("conversion_rate")
-  revenue         Decimal? @db.Decimal(10,2)
-  createdAt       DateTime @default(now()) @map("created_at")
+  id             DateTime @id @default(now())
+  metricDate     DateTime @unique @map("metric_date")
+  mrr            Decimal? @db.Decimal(10,2)
+  arr            Decimal? @db.Decimal(10,2)
+  activeUsers    Int?
+  newUsers       Int?
+  churnedUsers   Int?     @map("churned_users")
+  conversionRate Decimal? @db.Decimal(5,2) @map("conversion_rate")
+  revenue        Decimal? @db.Decimal(10,2)
+  createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("system_metrics")
 }
